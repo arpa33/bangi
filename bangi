@@ -15,10 +15,7 @@ sed -i 's/mode = \"full\"/mode = \"validator\"/g' $HOME/.celestia-app/config/con
       "profile": "https://github.com/PayneJoe",
       "contributions": [
         "code"
------------------------------------------------------------------
-max_num_inbound_peers=40 
-max_num_outbound_peers=10 
-max_connections=50
+
 --------------------------------------------------
 sed -i 's/timeout-commit = ".*/timeout-commit = "25s"/g' $HOME/.celestia-app/config/config.toml
 sed -i 's/peer-gossip-sleep-duration *=.*/peer-gossip-sleep-duration = "2ms"/g' $HOME/.celestia-app/config/config.toml
@@ -103,7 +100,10 @@ sudo systemctl restart celestia-appd && journalctl -u celestia-appd -f -o cat
 
 ------------------------------------------------------------
 Press CTRL+C to stop the logs
-
+-----------------------------------------------------------------
+max_num_inbound_peers=40 
+max_num_outbound_peers=10 
+max_connections=50
 -------------------------------------------------------------
 
 sudo systemctl stop celestia-appd
