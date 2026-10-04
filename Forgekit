@@ -1,0 +1,872 @@
+forgekit/
+├── src/
+│   ├── cli.ts
+│   ├── config.ts
+│   ├── generator.ts
+│   ├── templates.ts
+│   └── utils.ts
+├── templates/
+│   ├── github/
+│   │   ├── workflows/
+│   │   │   └── ci.yml
+│   │   ├── ISSUE_TEMPLATE/
+│   │   │   ├── bug_report.md
+│   │   │   └── feature_request.md
+│   │   └── pull_request_template.md
+│   └── shared/
+│       ├── CONTRIBUTING.md
+│       ├── SECURITY.md
+│       └── CHANGELOG.md
+├── package.json
+├── tsconfig.json
+├── LICENSE
+├── README.md
+└── .gitignore
+
+
+// ============================================================
+// package.json
+// ============================================================
+
+{
+  "name": "forgekit",
+  "version": "1.0.0",
+  "description": "A professional CLI for generating production-ready GitHub repositories.",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "forgekit": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "github",
+    "repository",
+    "cli",
+    "scaffolding",
+    "developer-tools",
+    "automation"
+  ],
+  "author": "Forgekit",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^14.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
+
+
+// ============================================================
+// tsconfig.json
+// ============================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+
+
+// ============================================================
+// src/config.ts
+// ============================================================
+
+export type ProjectType =
+  | "typescript"
+  | "python"
+  | "go"
+  | "rust";
+
+export interface ProjectConfig {
+  name: string;
+  description: string;
+  type: ProjectType;
+  author: string;
+  license: "MIT" | "Apache-2.0";
+  private: boolean;
+  dryRun: boolean;
+}
+
+export const supportedTypes: ProjectType[] = [
+  "typescript",
+  "python",
+  "go",
+  "rust"
+];
+
+export function validateProjectName(name: string): void {
+  if (!name) {
+    throw new Error("Project name is required.");
+  }
+
+  if (!/^[a-z0-9][a-z0-9-_]*$/.test(name)) {
+    throw new Error(
+      "Project name must contain only lowercase letters, numbers, hyphens, and underscores."
+    );
+  }
+
+  if (name.length > 64) {
+    throw new Error("Project name cannot exceed 64 characters.");
+  }
+}
+
+export function validateProjectType(type: string): asserts type is ProjectType {
+  if (!supportedTypes.includes(type as ProjectType)) {
+    throw new Error(
+      `Unsupported project type "${type}". Supported types: ${supportedTypes.join(", ")}`
+    );
+  }
+}
+
+
+// ============================================================
+// src/utils.ts
+// ============================================================
+
+import fs from "node:fs/promises";
+import path from "node:path";
+
+export async function ensureDirectory(directory: string): Promise<void> {
+  await fs.mkdir(directory, { recursive: true });
+}
+
+export async function writeFile(
+  filePath: string,
+  content: string
+): Promise<void> {
+  await ensureDirectory(path.dirname(filePath));
+  await fs.writeFile(filePath, content, "utf8");
+}
+
+export async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function sanitizeAuthor(author: string): string {
+  return author.trim() || "Contributors";
+}
+
+
+// ============================================================
+// src/templates.ts
+// ============================================================
+
+import type { ProjectConfig } from "./config.js";
+
+export function readmeTemplate(config: ProjectConfig): string {
+  return `# ${config.name}
+
+${config.description}
+
+## Overview
+
+${config.name} is designed with a clean, maintainable and production-oriented architecture.
+
+## Features
+
+- Clean project structure
+- GitHub Actions CI
+- Issue templates
+- Pull request template
+- Security policy
+- Contribution guidelines
+- Conventional project metadata
+- Ready for team collaboration
+
+## Getting Started
+
+Clone the repository:
+
+\\`\\`\\`bash
+git clone https://github.com/YOUR_USERNAME/${config.name}.git
+cd ${config.name}
+\\`\\`\\`
+
+Install dependencies and start development according to the selected project type.
+
+## Development
+
+Keep changes focused, documented and easy to review.
+
+Before opening a pull request, make sure:
+
+- Tests pass
+- Type checks pass
+- Documentation is updated
+- No secrets are committed
+- The change follows the project conventions
+
+## Project Structure
+
+\\`\\`\\`
+${config.name}/
+├── .github/
+├── src/
+├── README.md
+├── CONTRIBUTING.md
+├── SECURITY.md
+└── CHANGELOG.md
+\\`\\`\\`
+
+## License
+
+This project is licensed under the ${config.license} License.
+
+## Author
+
+${config.author}
+`;
+}
+
+export function gitignoreTemplate(type: ProjectConfig["type"]): string {
+  const common = `
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+dist/
+build/
+coverage/
+*.log
+`;
+
+  const languageSpecific: Record<ProjectConfig["type"], string> = {
+    typescript: `
+*.tsbuildinfo
+`,
+    python: `
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+`,
+    go: `
+bin/
+vendor/
+`,
+    rust: `
+target/
+Cargo.lock
+`
+  };
+
+  return `${common}${languageSpecific[type]}`.trimStart();
+}
+
+export function contributingTemplate(config: ProjectConfig): string {
+  return `# Contributing
+
+Thank you for contributing to ${config.name}.
+
+## Development Workflow
+
+1. Fork the repository.
+2. Create a focused branch.
+3. Make your changes.
+4. Run the available checks.
+5. Commit with a clear message.
+6. Open a pull request.
+
+## Guidelines
+
+- Keep changes focused.
+- Prefer readable code over clever code.
+- Add tests for meaningful behavior.
+- Update documentation when necessary.
+- Never commit credentials or private keys.
+
+## Pull Requests
+
+Pull requests should explain:
+
+- What changed
+- Why it changed
+- How it was tested
+- Any relevant limitations
+`;
+}
+
+export function securityTemplate(): string {
+  return `# Security Policy
+
+## Reporting a Vulnerability
+
+Please do not disclose security vulnerabilities through public GitHub issues.
+
+Report vulnerabilities privately to the project maintainers.
+
+Include:
+
+- A clear description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Any suggested mitigation
+
+Please allow maintainers reasonable time to investigate before public disclosure.
+`;
+}
+
+export function changelogTemplate(): string {
+  return `# Changelog
+
+All notable changes to this project will be documented here.
+
+## [1.0.0] - Initial Release
+
+- Initial repository structure
+- GitHub workflow
+- Contribution guidelines
+- Security policy
+- Issue templates
+`;
+}
+
+export function bugTemplate(): string {
+  return `---
+name: Bug report
+about: Report a reproducible problem
+title: "[Bug] "
+labels: bug
+---
+
+## Description
+
+Describe the problem clearly.
+
+## Steps to Reproduce
+
+1.
+2.
+3.
+
+## Expected Behavior
+
+What should happen?
+
+## Actual Behavior
+
+What happened instead?
+
+## Environment
+
+- OS:
+- Version:
+- Runtime:
+
+## Additional Context
+
+Add logs, screenshots, or other relevant information.
+`;
+}
+
+export function featureTemplate(): string {
+  return `---
+name: Feature request
+about: Suggest an improvement
+title: "[Feature] "
+labels: enhancement
+---
+
+## Problem
+
+What problem would this feature solve?
+
+## Proposed Solution
+
+Describe your proposed implementation.
+
+## Alternatives
+
+Describe alternatives you considered.
+
+## Additional Context
+
+Add any relevant context.
+`;
+}
+
+export function pullRequestTemplate(): string {
+  return `## Summary
+
+Describe the change in a few sentences.
+
+## Motivation
+
+Why is this change necessary?
+
+## Changes
+
+- 
+- 
+- 
+
+## Testing
+
+- [ ] Tests added or updated
+- [ ] Existing tests pass
+- [ ] Type checks pass
+
+## Checklist
+
+- [ ] Documentation updated
+- [ ] No secrets committed
+- [ ] Breaking changes documented
+`;
+}
+
+export function ciTemplate(type: ProjectConfig["type"]): string {
+  const commands: Record<ProjectConfig["type"], string> = {
+    typescript: `
+      npm ci
+      npm run typecheck
+      npm run build
+`,
+    python: `
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      python -m compileall .
+`,
+    go: `
+      go mod download
+      go test ./...
+      go vet ./...
+`,
+    rust: `
+      cargo check
+      cargo test
+      cargo clippy -- -D warnings
+`
+  };
+
+  return `name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ${type === "typescript"
+          ? "actions/setup-node@v4"
+          : type === "python"
+          ? "actions/setup-python@v5"
+          : type === "go"
+          ? "actions/setup-go@v5"
+          : "actions/checkout@v4"}
+
+      - name: Validate
+        run: |
+${commands[type]}
+`;
+}
+
+
+// ============================================================
+// src/generator.ts
+// ============================================================
+
+import path from "node:path";
+import fs from "node:fs/promises";
+
+import type { ProjectConfig } from "./config.js";
+import { pathExists, writeFile } from "./utils.js";
+
+import {
+  readmeTemplate,
+  gitignoreTemplate,
+  contributingTemplate,
+  securityTemplate,
+  changelogTemplate,
+  bugTemplate,
+  featureTemplate,
+  pullRequestTemplate,
+  ciTemplate
+} from "./templates.js";
+
+export async function generateRepository(
+  config: ProjectConfig
+): Promise<void> {
+  const root = path.resolve(process.cwd(), config.name);
+
+  if (await pathExists(root)) {
+    throw new Error(
+      `Directory "${config.name}" already exists. Choose another name.`
+    );
+  }
+
+  const files: Record<string, string> = {
+    "README.md": readmeTemplate(config),
+    ".gitignore": gitignoreTemplate(config.type),
+    "CONTRIBUTING.md": contributingTemplate(config),
+    "SECURITY.md": securityTemplate(),
+    "CHANGELOG.md": changelogTemplate(),
+
+    ".github/workflows/ci.yml": ciTemplate(config.type),
+
+    ".github/ISSUE_TEMPLATE/bug_report.md": bugTemplate(),
+
+    ".github/ISSUE_TEMPLATE/feature_request.md": featureTemplate(),
+
+    ".github/pull_request_template.md": pullRequestTemplate(),
+
+    "src/.gitkeep": ""
+  };
+
+  if (config.type === "typescript") {
+    files["package.json"] = JSON.stringify(
+      {
+        name: config.name,
+        version: "1.0.0",
+        private: config.private,
+        type: "module",
+        scripts: {
+          build: "tsc",
+          typecheck: "tsc --noEmit"
+        }
+      },
+      null,
+      2
+    ) + "\n";
+
+    files["tsconfig.json"] = JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2022",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          strict: true,
+          outDir: "dist"
+        },
+        include: ["src/**/*.ts"]
+      },
+      null,
+      2
+    ) + "\n";
+
+    files["src/index.ts"] = `export function main(): void {
+  console.log("${config.name} is ready.");
+}
+
+main();
+`;
+  }
+
+  if (config.type === "python") {
+    files["pyproject.toml"] = `[project]
+name = "${config.name}"
+version = "1.0.0"
+description = "${config.description}"
+requires-python = ">=3.11"
+`;
+
+    files["src/main.py"] = `def main() -> None:
+    print("${config.name} is ready.")
+
+
+if __name__ == "__main__":
+    main()
+`;
+  }
+
+  if (config.type === "go") {
+    files["go.mod"] = `module ${config.name}
+
+go 1.23
+`;
+
+    files["main.go"] = `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("${config.name} is ready.")
+}
+`;
+  }
+
+  if (config.type === "rust") {
+    files["Cargo.toml"] = `[package]
+name = "${config.name}"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+`;
+
+    files["src/main.rs"] = `fn main() {
+    println!("${config.name} is ready.");
+}
+`;
+  }
+
+  for (const [file, content] of Object.entries(files)) {
+    await writeFile(path.join(root, file), content);
+  }
+
+  await fs.writeFile(
+    path.join(root, ".forgekit.json"),
+    JSON.stringify(config, null, 2) + "\n",
+    "utf8"
+  );
+
+  console.log("");
+  console.log(`✓ Repository created: ${root}`);
+  console.log("");
+  console.log("Next steps:");
+  console.log(`  cd ${config.name}`);
+
+  if (config.type === "typescript") {
+    console.log("  npm install");
+  }
+
+  console.log("  git init");
+  console.log("  git add .");
+  console.log('  git commit -m "chore: initialize repository"');
+  console.log("");
+}
+
+
+// ============================================================
+// src/cli.ts
+// ============================================================
+
+#!/usr/bin/env node
+
+import { Command } from "commander";
+
+import {
+  validateProjectName,
+  validateProjectType,
+  supportedTypes,
+  type ProjectType,
+  type ProjectConfig
+} from "./config.js";
+
+import { generateRepository } from "./generator.js";
+
+const program = new Command();
+
+program
+  .name("forgekit")
+  .description(
+    "Generate production-ready GitHub repositories from the command line."
+  )
+  .version("1.0.0");
+
+program
+  .command("create")
+  .description("Create a new GitHub repository structure")
+  .argument("<name>", "repository name")
+  .option(
+    "-t, --type <type>",
+    `project type (${supportedTypes.join(", ")})`,
+    "typescript"
+  )
+  .option(
+    "-d, --description <description>",
+    "project description",
+    "A production-ready software project."
+  )
+  .option("-a, --author <author>", "author name", "Contributors")
+  .option(
+    "-l, --license <license>",
+    "license type (MIT, Apache-2.0)",
+    "MIT"
+  )
+  .option("--private", "mark repository as private")
+  .option("--dry-run", "validate configuration without creating files")
+  .action(
+    async (
+      name: string,
+      options: {
+        type: string;
+        description: string;
+        author: string;
+        license: string;
+        private?: boolean;
+        dryRun?: boolean;
+      }
+    ) => {
+      try {
+        validateProjectName(name);
+        validateProjectType(options.type);
+
+        if (
+          options.license !== "MIT" &&
+          options.license !== "Apache-2.0"
+        ) {
+          throw new Error(
+            'License must be either "MIT" or "Apache-2.0".'
+          );
+        }
+
+        const config: ProjectConfig = {
+          name,
+          description: options.description,
+          type: options.type as ProjectType,
+          author: options.author,
+          license: options.license as "MIT" | "Apache-2.0",
+          private: Boolean(options.private),
+          dryRun: Boolean(options.dryRun)
+        };
+
+        if (config.dryRun) {
+          console.log("");
+          console.log("Configuration valid.");
+          console.log("");
+          console.log(JSON.stringify(config, null, 2));
+          console.log("");
+          return;
+        }
+
+        await generateRepository(config);
+      } catch (error) {
+        console.error(
+          `\nError: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }\n`
+        );
+
+        process.exitCode = 1;
+      }
+    }
+  );
+
+program
+  .command("info")
+  .description("Display Forgekit information")
+  .action(() => {
+    console.log(`
+Forgekit
+--------
+
+Professional GitHub repository scaffolding CLI.
+
+Supported project types:
+${supportedTypes.map((type) => `  • ${type}`).join("\n")}
+
+Example:
+  forgekit create my-project --type typescript
+`);
+  });
+
+program.parseAsync(process.argv);
+
+
+// ============================================================
+// LICENSE
+// ============================================================
+
+MIT License
+
+Copyright (c) 2026 Forgekit Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+
+// ============================================================
+// .gitignore
+// ============================================================
+
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+*.tsbuildinfo
+
+
+// ============================================================
+// README.md
+// ============================================================
+
+# Forgekit
+
+Forgekit is a professional CLI for generating clean, production-ready GitHub repositories in seconds.
+
+## Why Forgekit?
+
+Starting a project should not mean manually recreating the same repository structure every time.
+
+Forgekit automates the boring parts while keeping the generated project simple, readable and customizable.
+
+## Features
+
+- Multi-language project scaffolding
+- GitHub Actions CI
+- Issue templates
+- Pull request template
+- Security policy
+- Contribution guidelines
+- Changelog
+- License configuration
+- Dry-run validation
+- Zero database
+- Minimal runtime dependencies
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/forgekit.git
+cd forgekit
+npm install
+npm run build
